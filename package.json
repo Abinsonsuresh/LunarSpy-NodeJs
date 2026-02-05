@@ -1,0 +1,18 @@
+{
+  "name": "lunarspy",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "dtw": "^0.0.3",
+    "meyda": "^5.6.3",
+    "node-record-lpcm16": "^1.0.1",
+    "wav": "^1.0.2"
+  }
+}
