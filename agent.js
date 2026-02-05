@@ -6,6 +6,10 @@ const { exec } = require('child_process');
 // --- CONFIGURATION ---
 const TRAINING_FILE = 'kashmiri_model.json';
 
+// --- DANGER WORDS LIST ---
+// If the detected word matches one of these, it adds "Danger" to the speech.
+const DANGER_WORDS = ["danger", "gun", "bomb", "kill", "attack", "fire"];
+
 // --- DEBUG SETTINGS ---
 const SHOW_VOLUME_METER = true; 
 
@@ -107,7 +111,7 @@ function checkForMatch() {
     if (lowestDistance < MATCH_THRESHOLD) {
         console.log(`\n🔎 Best Guess: ${bestMatch} (Score: ${lowestDistance.toFixed(2)})`);
         
-        if (lowestDistance < (MATCH_THRESHOLD)) {
+        if (lowestDistance < MATCH_THRESHOLD) {
              const translation = knownWords[bestMatch].translation;
              triggerAlert(bestMatch, translation, lowestDistance);
              liveFeatures = []; 
@@ -119,12 +123,20 @@ function checkForMatch() {
 function triggerAlert(kashmiriWord, englishTranslation, confidence) {
     // 1. Log the Exact Match
     console.log(`\n✅✅✅ MATCH CONFIRMED: "${kashmiriWord.toUpperCase()}"`);
-    
-    // 2. Speak the English Word (For ALL words)
-    speak(englishTranslation);
-
-    // 3. Log the "Detection" (For ALL words in vocab.js)
     console.log(`📢 DETECTED VOCAB WORD: [${englishTranslation.toUpperCase()}]`);
+
+    // 2. Prepare text to speak
+    let textToSpeak = englishTranslation;
+
+    // 3. Check if it is a Danger Word
+    if (DANGER_WORDS.includes(englishTranslation.toLowerCase())) {
+        console.log(`🚨 THREAT DETECTED! Adding warning...`);
+        // Append "Danger" to the speech
+        textToSpeak = `${englishTranslation}... Danger!`;
+    }
+
+    // 4. Speak
+    speak(textToSpeak);
     
     console.log("------------------------------------------------");
 }
