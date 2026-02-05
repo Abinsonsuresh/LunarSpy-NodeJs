@@ -1,17 +1,17 @@
 const recorder = require('node-record-lpcm16');
 const Meyda = require('meyda');
 const fs = require('fs');
+const { exec } = require('child_process'); // <--- Added for speaking
 
 // --- CONFIGURATION ---
 const TRAINING_FILE = 'kashmiri_model.json';
 
 // --- DEBUG SETTINGS ---
-const SHOW_VOLUME_METER = true; // Set to false later to reduce clutter
+const SHOW_VOLUME_METER = true; 
 
 // --- TUNING ---
-// I lowered this massively. If it's too sensitive, raise it to 0.002
 const MIN_VOLUME_THRESHOLD = 0.0002; 
-const MATCH_THRESHOLD = 12; // Loosened this up slightly for testing
+const MATCH_THRESHOLD = 12; 
 
 const TERROR_KEYWORDS = ["danger", "attack", "gun", "bomb", "kill"];
 
@@ -23,18 +23,34 @@ if (!fs.existsSync(TRAINING_FILE)) {
 const knownWords = JSON.parse(fs.readFileSync(TRAINING_FILE));
 
 console.log("------------------------------------------------");
-console.log("🛠️  DIAGNOSTICS MODE");
+console.log("🛠️  DIAGNOSTICS MODE (Voice Enabled)");
 console.log(`🎤 volume threshold: ${MIN_VOLUME_THRESHOLD}`);
-console.log("If you see 'Silence...', your mic is working but the sound is low.");
 console.log("------------------------------------------------");
 
 let liveFeatures = [];  
-const MAX_HISTORY = 100; // Shorter history for faster response
+const MAX_HISTORY = 100; 
+
+// --- SPEAKING FUNCTION ---
+function speak(text) {
+    const platform = process.platform;
+    
+    if (platform === 'darwin') { 
+        // macOS
+        exec(`say "${text}"`); 
+    } else if (platform === 'win32') { 
+        // Windows
+        const command = `PowerShell -Command "Add-Type –AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('${text}');"`;
+        exec(command);
+    } else { 
+        // Linux (requires espeak installed)
+        exec(`espeak "${text}"`); 
+    }
+}
 
 const recording = recorder.record({
     sampleRate: 16000,
     threshold: 0,
-    recordProgram: 'sox', // Ensure 'sox' is installed on your system!
+    recordProgram: 'sox', 
 });
 
 const stream = recording.stream();
@@ -60,7 +76,7 @@ stream.on('data', (chunk) => {
         
         if (features) {
             // DEBUG: Print Volume
-            if (SHOW_VOLUME_METER && Math.random() < 0.1) { // Only print 10% of frames to save console space
+            if (SHOW_VOLUME_METER && Math.random() < 0.1) { 
                  const bars = "I".repeat(Math.ceil(features.rms * 1000));
                  if (features.rms > MIN_VOLUME_THRESHOLD) {
                      console.log(`🔊 Hearing: ${features.rms.toFixed(5)} ${bars}`);
@@ -71,8 +87,6 @@ stream.on('data', (chunk) => {
             if (features.rms > MIN_VOLUME_THRESHOLD) {
                 liveFeatures.push(features.mfcc);
             } else {
-                // If silence, we slowly shrink the buffer (decay) rather than clearing it instantly
-                // This prevents cutting off the end of words
                 if (liveFeatures.length > 0) {
                     liveFeatures.shift();
                 }
@@ -98,10 +112,8 @@ function checkForMatch() {
     for (const [word, data] of Object.entries(knownWords)) {
         const trainedFeatures = data.features;
         
-        // Only compare if we have roughly enough data
         if (liveFeatures.length < trainedFeatures.length * 0.5) continue;
 
-        // Compare recent history
         const compareLength = Math.min(liveFeatures.length, trainedFeatures.length);
         const liveSegment = liveFeatures.slice(liveFeatures.length - compareLength);
         const trainedSegment = trainedFeatures.slice(0, compareLength);
@@ -115,21 +127,23 @@ function checkForMatch() {
         }
     }
 
-    // If we found a decent match
     if (lowestDistance < MATCH_THRESHOLD) {
         console.log(`\n🔎 Best Guess: ${bestMatch} (Score: ${lowestDistance.toFixed(2)})`);
         
-        // Strict confirmation
-        if (lowestDistance < (MATCH_THRESHOLD - 2)) {
+        if (lowestDistance < (MATCH_THRESHOLD)) {
              const translation = knownWords[bestMatch].translation;
              triggerAlert(bestMatch, translation, lowestDistance);
-             liveFeatures = []; // Reset after successful match
+             liveFeatures = []; 
         }
     }
 }
 
 function triggerAlert(kashmiriWord, englishTranslation, confidence) {
     console.log(`\n✅✅✅ MATCH CONFIRMED: "${kashmiriWord.toUpperCase()}"`);
+    
+    // 🗣️ SPEAK THE ENGLISH WORD
+    speak(englishTranslation);
+
     if (TERROR_KEYWORDS.includes(englishTranslation.toLowerCase())) {
         console.log(`🚨 THREAT DETECTED [${englishTranslation}]`);
     }
