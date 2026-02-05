@@ -132,7 +132,7 @@ function triggerAlert(kashmiriWord, englishTranslation, confidence) {
     if (DANGER_WORDS.includes(englishTranslation.toLowerCase())) {
         console.log(`🚨 THREAT DETECTED! Adding warning...`);
         // Append "Danger" to the speech
-        textToSpeak = `${englishTranslation}... Danger!`;
+        textToSpeak = `${englishTranslation}... Danger Danger Danger Danger !`;
     }
 
     // 4. Speak
