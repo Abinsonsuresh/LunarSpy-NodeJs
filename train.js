@@ -7,6 +7,7 @@ const TRAINING_FILE = 'kashmiri_model.json';
 const RECORDING_DURATION = 2000; 
 
 let trainingData = {};
+// Load existing data if available so we don't overwrite previous training unless necessary
 if (fs.existsSync(TRAINING_FILE)) {
     try {
         trainingData = JSON.parse(fs.readFileSync(TRAINING_FILE));
@@ -36,6 +37,7 @@ async function trainWord(wordObj) {
         const stream = recording.stream();
 
         stream.on('data', (chunk) => {
+            // Convert raw bytes to float samples
             for (let i = 0; i < chunk.length; i += 2) {
                 if (i + 1 < chunk.length) {
                     const int16 = chunk.readInt16LE(i);
@@ -43,6 +45,7 @@ async function trainWord(wordObj) {
                 }
             }
 
+            // Extract MFCCs
             while (audioBuffer.length >= BUFFER_SIZE) {
                 const signal = audioBuffer.slice(0, BUFFER_SIZE);
                 audioBuffer = audioBuffer.slice(BUFFER_SIZE);
@@ -52,6 +55,7 @@ async function trainWord(wordObj) {
             }
         });
 
+        // Stop recording after duration
         setTimeout(() => {
             recording.stop();
             console.log(`✅ Stopped. Captured ${collectedFeatures.length} frames.`);
@@ -61,16 +65,22 @@ async function trainWord(wordObj) {
 }
 
 async function startTraining() {
+    console.log(`Starting training for ${wordsToTrain.length} words...`);
+    
     for (const item of wordsToTrain) {
         const features = await trainWord(item);
+        
+        // Save features and translation to memory
         trainingData[item.kashmiri] = {
             features: features,
             translation: item.english
         };
+        
         console.log(`💾 Saved "${item.kashmiri}" to memory.`);
-        await sleep(1000);
+        await sleep(1000); // Pause before the next word
     }
     
+    // Write everything to the file
     fs.writeFileSync(TRAINING_FILE, JSON.stringify(trainingData));
     console.log(`\n🎉 Training Complete! Model saved to ${TRAINING_FILE}`);
 }
